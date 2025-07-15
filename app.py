@@ -6,25 +6,21 @@ import os
 app = Flask(__name__)
 
 # --- Veritabanı Ayarları ---
-# Render'dan aldığınız External Database URL'sini buraya yapıştırın.
-# Güvenlik için, bu URL'yi doğrudan koda yazmak yerine çevre değişkeni (environment variable) olarak kullanmak daha iyidir.
-# Şimdilik direkt yazalım, Render'a dağıtırken çevre değişkenine çeviririz.
-DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://galataport_user:GUiENjNBJyCiVKeYUpbaK6tgvs71Dy5n@dpg-d1r41bbipnbc73f14u70-a.oregon-postgres.render.com/galataport')
-# YUKARIDAKİ 'postgresql://your_user:your_password@your_host:your_port/your_database' KISMINI KENDİ RENDER URL'NİZLE DEĞİŞTİRİN!
+DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://your_user:your_password@your_host:your_port/your_database')
+# KENDİ RENDER URL'NİZİ BURAYA YAPIŞTIRDIĞINIZDAN EMİN OLUN!
 
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False # Bellek tüketimini azaltmak için False yapın
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 # --- Veritabanı Modelleri ---
-# Kullanıcılar tablosu (Admin, Yönetici, Makineci)
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(120), nullable=False)
     role = db.Column(db.String(20), nullable=False) # 'admin', 'manager', 'technician'
     device_id = db.Column(db.String(255), unique=True, nullable=True) # Android ID için
-
+    
     def to_dict(self):
         return {
             "id": self.id,
@@ -33,14 +29,13 @@ class User(db.Model):
             "device_id": self.device_id
         }
 
-# Makineler tablosu
 class Machine(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False) # "Zemin Temizleyici 1"
-    bluetooth_mac = db.Column(db.String(17), unique=True, nullable=False) # "08:D1:F9:E9:C2:CE"
-    friendly_name = db.Column(db.String(100), unique=True, nullable=True) # "Makine 855-4"
-    is_active = db.Column(db.Boolean, default=True) # Makine aktif mi, pasif mi?
-
+    name = db.Column(db.String(100), nullable=False)
+    bluetooth_mac = db.Column(db.String(17), unique=True, nullable=False)
+    friendly_name = db.Column(db.String(100), unique=True, nullable=True)
+    is_active = db.Column(db.Boolean, default=True)
+    
     def to_dict(self):
         return {
             "id": self.id,
@@ -50,16 +45,13 @@ class Machine(db.Model):
             "is_active": self.is_active
         }
 
-# Kullanıcı-Makine Atamaları (Kim hangi makineyi kullanabilir)
 class MachineAssignment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     machine_id = db.Column(db.Integer, db.ForeignKey('machine.id'), nullable=False)
-    start_date = db.Column(db.DateTime, default=datetime.utcnow) # Atamanın başladığı zaman
-    end_date = db.Column(db.DateTime, nullable=True) # Atamanın bittiği zaman (istenirse)
-
-    # Bu atamanın hangi vardiyalarda geçerli olduğunu da buraya ekleyebiliriz (şimdilik basit tutalım)
-
+    start_date = db.Column(db.DateTime, default=datetime.utcnow)
+    end_date = db.Column(db.DateTime, nullable=True)
+    
     user = db.relationship('User', backref=db.backref('assignments', lazy=True))
     machine = db.relationship('Machine', backref=db.backref('assignments', lazy=True))
 
@@ -75,14 +67,13 @@ class MachineAssignment(db.Model):
             "end_date": self.end_date.isoformat() if self.end_date else None
         }
 
-# Kullanım Logları (Kim, hangi makineyi, ne zaman kullandı)
 class UsageLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     machine_id = db.Column(db.Integer, db.ForeignKey('machine.id'), nullable=False)
     start_time = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     end_time = db.Column(db.DateTime, nullable=True)
-    duration_minutes = db.Column(db.Integer, nullable=True) # Dakika cinsinden kullanım süresi
+    duration_minutes = db.Column(db.Integer, nullable=True)
 
     user = db.relationship('User', backref=db.backref('usage_logs', lazy=True))
     machine = db.relationship('Machine', backref=db.backref('usage_logs', lazy=True))
@@ -101,21 +92,20 @@ class UsageLog(db.Model):
 
 # --- API Endpoint'leri ---
 
-# İlk çalıştırmada veritabanı tablolarını oluşturmak ve örnek veri eklemek için.
-# Sadece geliştirme ortamında çalıştırılmalı!
 @app.cli.command("initdb")
 def initdb_command():
     """Veritabanı tablolarını oluşturur ve örnek veriler ekler."""
+    db.drop_all() # Mevcut tabloları temizle (Geliştirme için)
     db.create_all()
-
+    
     # Örnek Kullanıcılar
     admin_user = User(username='admin', password='adminpass', role='admin', device_id='admin_device_id_example')
     manager_user = User(username='yonetici', password='managerpass', role='manager', device_id='manager_device_id_example')
     tech1 = User(username='makineci1', password='pass123', role='technician', device_id='tech1_device_id_example')
     tech2 = User(username='makineci2', password='pass123', role='technician', device_id='tech2_device_id_example')
-
+    
     db.session.add_all([admin_user, manager_user, tech1, tech2])
-    db.session.commit() # Kullanıcıları kaydet ki ID'leri oluşsun
+    db.session.commit()
 
     # Örnek Makineler
     machine1 = Machine(name='Zemin Temizleyici 1', bluetooth_mac='08:D1:F9:E9:C2:CE', friendly_name='Makine 855-4')
@@ -123,12 +113,12 @@ def initdb_command():
     machine3 = Machine(name='Vakumlu Süpürge 3', bluetooth_mac='AC:D1:F9:YY:YY:ZZ', friendly_name='Makine DEF') # Kendi MAC'lerinizi yazın
 
     db.session.add_all([machine1, machine2, machine3])
-    db.session.commit() # Makineleri kaydet ki ID'leri oluşsun
+    db.session.commit()
 
     # Örnek Atamalar (makineci1 Makine 855-4 ve Makine ABC'yi kullanabilir)
     assign1 = MachineAssignment(user_id=tech1.id, machine_id=machine1.id)
     assign2 = MachineAssignment(user_id=tech1.id, machine_id=machine2.id)
-
+    
     db.session.add_all([assign1, assign2])
     db.session.commit()
 
@@ -138,40 +128,115 @@ def initdb_command():
 def home():
     return "Merhaba Galataport Backend API! Veritabanı entegrasyonu tamamlandı."
 
-# Kullanıcı kimlik doğrulama endpoint'i (username/password veya device_id ile)
+# Kullanıcı kimlik doğrulama endpoint'i
 @app.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
-    device_id = data.get('device_id') # Android ID'sini almak için
+    device_id = data.get('device_id')
 
     user = None
-    if username and password: # Kullanıcı adı ve şifre ile giriş
+    if username and password:
         user = User.query.filter_by(username=username, password=password).first()
-    elif device_id: # Sadece device_id ile giriş (Admin'in atadığı telefonlar için)
+    elif device_id:
         user = User.query.filter_by(device_id=device_id).first()
-        if not user: # Eğer device_id ile bulunamazsa, kullanıcı adı şifre de deneyebiliriz
-             if username and password:
-                 user = User.query.filter_by(username=username, password=password).first()
-
 
     if user:
         return jsonify({
             "message": "Giriş başarılı",
-            "user": user.to_dict(), # Kullanıcı bilgilerini döndür
+            "user": user.to_dict(),
             "role": user.role
         }), 200
     else:
         return jsonify({"message": "Geçersiz kimlik bilgileri veya yetkisiz cihaz"}), 401
 
-# Tüm makineleri listeleme endpoint'i (yetkilendirmeye sonra bakarız)
+# --- Admin Panel API Endpoint'leri ---
+
+# Tüm kullanıcıları listeleme
+@app.route('/users', methods=['GET'])
+def get_users():
+    users = User.query.all()
+    return jsonify([user.to_dict() for user in users]), 200
+
+# Yeni kullanıcı ekleme
+@app.route('/users', methods=['POST'])
+def add_user():
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    role = data.get('role')
+    device_id = data.get('device_id') # None olabilir
+
+    if not username or not password or not role:
+        return jsonify({"message": "Kullanıcı adı, şifre ve rol zorunludur"}), 400
+
+    if User.query.filter_by(username=username).first():
+        return jsonify({"message": "Kullanıcı adı zaten mevcut"}), 409
+    if device_id and User.query.filter_by(device_id=device_id).first():
+        return jsonify({"message": "Cihaz ID'si zaten başka bir kullanıcıya atanmış"}), 409
+
+    new_user = User(username=username, password=password, role=role, device_id=device_id)
+    db.session.add(new_user)
+    db.session.commit()
+    return jsonify({"message": "Kullanıcı başarıyla eklendi", "user": new_user.to_dict()}), 201
+
+# Kullanıcı silme
+@app.route('/users/<int:user_id>', methods=['DELETE'])
+def delete_user(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"message": "Kullanıcı bulunamadı"}), 404
+    
+    # Kullanıcıya ait atamaları ve logları da sil (önemli!)
+    MachineAssignment.query.filter_by(user_id=user_id).delete()
+    UsageLog.query.filter_by(user_id=user_id).delete()
+    db.session.delete(user)
+    db.session.commit()
+    return jsonify({"message": "Kullanıcı başarıyla silindi"}), 200
+
+# Tüm makineleri listeleme
 @app.route('/machines', methods=['GET'])
 def get_machines():
     machines_data = [machine.to_dict() for machine in Machine.query.all()]
     return jsonify(machines_data), 200
 
-# Kullanıcıya atanmış makineleri listeleme endpoint'i (role göre filtreleme)
+# Yeni makine ekleme
+@app.route('/machines', methods=['POST'])
+def add_machine():
+    data = request.get_json()
+    name = data.get('name')
+    friendly_name = data.get('friendly_name')
+    bluetooth_mac = data.get('bluetooth_mac')
+
+    if not name or not bluetooth_mac:
+        return jsonify({"message": "Makine adı ve Bluetooth MAC adresi zorunludur"}), 400
+    
+    # MAC adresi format kontrolü eklenebilir
+
+    if Machine.query.filter_by(bluetooth_mac=bluetooth_mac).first():
+        return jsonify({"message": "Bu MAC adresine sahip makine zaten mevcut"}), 409
+
+    new_machine = Machine(name=name, friendly_name=friendly_name, bluetooth_mac=bluetooth_mac)
+    db.session.add(new_machine)
+    db.session.commit()
+    return jsonify({"message": "Makine başarıyla eklendi", "machine": new_machine.to_dict()}), 201
+
+# Makine silme
+@app.route('/machines/<int:machine_id>', methods=['DELETE'])
+def delete_machine(machine_id):
+    machine = Machine.query.get(machine_id)
+    if not machine:
+        return jsonify({"message": "Makine bulunamadı"}), 404
+    
+    # Makineye ait atamaları ve logları da sil (önemli!)
+    MachineAssignment.query.filter_by(machine_id=machine_id).delete()
+    UsageLog.query.filter_by(machine_id=machine_id).delete()
+    db.session.delete(machine)
+    db.session.commit()
+    return jsonify({"message": "Makine başarıyla silindi"}), 200
+
+# Kullanıcıya atanmış makineleri listeleme (mobil uygulama için)
 @app.route('/my_machines/<int:user_id>', methods=['GET'])
 def get_my_machines(user_id):
     user = User.query.get(user_id)
@@ -180,15 +245,13 @@ def get_my_machines(user_id):
 
     assigned_machines = []
     if user.role == 'admin' or user.role == 'manager':
-        # Admin veya yönetici tüm aktif makineleri görebilir (şimdilik)
         assigned_machines = [m.to_dict() for m in Machine.query.filter_by(is_active=True).all()]
     elif user.role == 'technician':
-        # Makineci sadece kendisine atanmış makineleri görebilir
         assignments = MachineAssignment.query.filter_by(user_id=user.id).all()
         for assignment in assignments:
             if assignment.machine.is_active:
                 assigned_machines.append(assignment.machine.to_dict())
-
+    
     return jsonify(assigned_machines), 200
 
 # Makine kullanımı başlatma endpoint'i
@@ -203,14 +266,13 @@ def start_usage():
 
     if not user or not machine:
         return jsonify({"message": "Kullanıcı veya makine bulunamadı"}), 404
-
-    # Yetki kontrolü (şimdilik basit: atanmışsa veya admin/manager ise)
+    
     if user.role == 'technician':
         assignment = MachineAssignment.query.filter_by(user_id=user.id, machine_id=machine.id).first()
         if not assignment:
             return jsonify({"message": "Bu makineyi kullanmaya yetkiniz yok"}), 403
 
-    # Eğer makine zaten kullanılıyorsa, mevcut log'u sonlandırabiliriz veya hata verebiliriz
+    # Eğer makine şu an kullanımda ise (devam eden bir log varsa), eskiyi bitirip yeni başlatma mantığı eklenebilir.
     # Şimdilik basitçe yeni bir log başlatıyoruz.
     new_log = UsageLog(user_id=user.id, machine_id=machine.id, start_time=datetime.utcnow())
     db.session.add(new_log)
@@ -221,27 +283,32 @@ def start_usage():
 @app.route('/usage/end', methods=['POST'])
 def end_usage():
     data = request.get_json()
-    log_id = data.get('log_id') # Başlatma sırasında dönen log_id
+    log_id = data.get('log_id')
     end_time = datetime.utcnow()
 
     log = UsageLog.query.get(log_id)
     if not log:
         return jsonify({"message": "Kullanım kaydı bulunamadı"}), 404
-
+    
     log.end_time = end_time
-    # Süre hesaplama (dakika cinsinden)
     duration_seconds = (end_time - log.start_time).total_seconds()
     log.duration_minutes = int(duration_seconds / 60)
-
+    
     db.session.commit()
     return jsonify({"message": "Kullanım sonlandırıldı", "log": log.to_dict()}), 200
 
 # Tüm kullanım loglarını listeleme (Admin/Yönetici için)
 @app.route('/usage_logs', methods=['GET'])
 def get_usage_logs():
-    logs_data = [log.to_dict() for log in UsageLog.query.order_by(UsageLog.start_time.desc()).all()]
+    logs_data = []
+    logs = UsageLog.query.order_by(UsageLog.start_time.desc()).all()
+    for log in logs:
+        log_dict = log.to_dict()
+        # LogDict'e kullanıcı adı ve makine adını da ekleyelim kolaylık için
+        log_dict['username'] = log.user.username if log.user else 'Bilinmiyor'
+        log_dict['machine_name'] = log.machine.name if log.machine else 'Bilinmiyor'
+        logs_data.append(log_dict)
     return jsonify(logs_data), 200
-
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
