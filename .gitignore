@@ -1,0 +1,18 @@
+# Python specific
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/  # Sanal ortam klasörünüz (venv)
+*.egg-info/
+.pytest_cache/
+
+# IDE specific
+.idea/  # Eğer PyCharm veya başka bir IDE kullanıyorsanız
+.vscode/
+
+# Operating System
+.DS_Store
+Thumbs.db
