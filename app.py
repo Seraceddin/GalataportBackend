@@ -8,7 +8,7 @@ app = Flask(__name__)
 CORS(app) # BURADA OLMALI!
 
 # --- Veritabanı Ayarları ---
-DATABASE_URL = os.environ.get('DATABASE_URL', postgresql://galataport_user:GUiENjNBJyCiVKeYUpbaK6tgvs71Dy5n@dpg-d1r41bbipnbc73f14u70-a/galataport)
+DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://galataport_user:GUiENjNBJyCiVKeYUpbaK6tgvs71Dy5n@dpg-d1r41bbipnbc73f14u70-a/galataport')
 # KENDİ RENDER URL'NİZİ BURAYA YAPIŞTIRDIĞINIZDAN EMİN OLUN!
 
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
