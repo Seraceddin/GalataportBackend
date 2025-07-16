@@ -347,8 +347,8 @@ def register_device():
 
     return jsonify({"message": "Cihaz başarıyla kaydedildi, yönetici onayı bekleniyor", "user_id": new_user.id}), 201
     
-    @app.route('/users/<int:user_id>', methods=['PUT']) # veya PATCH
-    def update_user(user_id):
+@app.route('/users/<int:user_id>', methods=['PUT']) # veya PATCH
+def update_user(user_id):
     user = User.query.get(user_id)
     if not user:
         return jsonify({"message": "Kullanıcı bulunamadı"}), 404
