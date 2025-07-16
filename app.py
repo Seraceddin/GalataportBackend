@@ -311,6 +311,42 @@ def get_usage_logs():
         log_dict['machine_name'] = log.machine.name if log.machine else 'Bilinmiyor'
         logs_data.append(log_dict)
     return jsonify(logs_data), 200
+    
+@app.route('/register_device', methods=['POST'])
+def register_device():
+    data = request.get_json()
+    name = data.get('name')
+    surname = data.get('surname')
+    device_id = data.get('device_id')
+
+    if not name or not surname or not device_id:
+        return jsonify({"message": "Ad, Soyad ve Cihaz ID zorunludur"}), 400
+
+    # device_id zaten kayıtlı mı kontrol et
+    existing_user_with_device = User.query.filter_by(device_id=device_id).first()
+    if existing_user_with_device:
+        return jsonify({"message": "Bu cihaz ID'si zaten kayıtlı"}), 409 # Conflict
+
+    # Kullanıcı adı olarak ad ve soyadı birleştir
+    username = f"{name.lower().replace(' ', '')}.{surname.lower().replace(' ', '')}"
+    # Basit bir şifre (admin tarafından atanacak veya varsayılan)
+    # Şimdilik varsayılan bir şifre koyalım, admin panelinden değiştirilebilir
+    password = "default_password" # Buraya güvenli bir varsayılan şifre belirleyin
+
+    # Yeni kullanıcı oluştur, rolü 'pending' veya 'unassigned' olarak belirleyelim
+    # Admin tarafından atanana kadar yetkisiz kalacak
+    new_user = User(username=username, password=password, role='pending', device_id=device_id)
+
+    # Eğer aynı kullanıcı adı zaten varsa (çakışma olabilir)
+    # user_count = User.query.filter_by(username=username).count()
+    # if user_count > 0:
+    #     username = f"{username}{user_count + 1}" # Kullanıcı adını benzersiz yap
+
+    db.session.add(new_user)
+    db.session.commit()
+
+    return jsonify({"message": "Cihaz başarıyla kaydedildi, yönetici onayı bekleniyor", "user_id": new_user.id}), 201
+    
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
