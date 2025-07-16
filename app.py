@@ -347,6 +347,31 @@ def register_device():
 
     return jsonify({"message": "Cihaz başarıyla kaydedildi, yönetici onayı bekleniyor", "user_id": new_user.id}), 201
     
+    @app.route('/users/<int:user_id>', methods=['PUT']) # veya PATCH
+    def update_user(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"message": "Kullanıcı bulunamadı"}), 404
+
+    data = request.get_json()
+    new_role = data.get('role')
+    new_device_id = data.get('device_id') # None olabilir
+
+    if new_role:
+        user.role = new_role
+
+    # Eğer yeni device_id varsa ve başka bir kullanıcıya atanmamışsa güncelle
+    if new_device_id:
+        existing_user_with_new_device = User.query.filter(User.device_id == new_device_id, User.id != user_id).first()
+        if existing_user_with_new_device:
+            return jsonify({"message": "Bu cihaz ID'si zaten başka bir kullanıcıya atanmış"}), 409
+        user.device_id = new_device_id
+    else: # Eğer device_id boş gönderilmişse (yani temizlemek isteniyorsa)
+        user.device_id = None # Veya boş string ''
+
+    db.session.commit()
+    return jsonify({"message": "Kullanıcı başarıyla güncellendi", "user": user.to_dict()}), 200
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
