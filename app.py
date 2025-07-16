@@ -371,6 +371,53 @@ def update_user(user_id):
 
     db.session.commit()
     return jsonify({"message": "Kullanıcı başarıyla güncellendi", "user": user.to_dict()}), 200
+@app.route('/assign_machine', methods=['POST'])
+def assign_machine():
+    data = request.get_json()
+    user_id = data.get('user_id')
+    machine_id = data.get('machine_id')
+
+    if not user_id or not machine_id:
+        return jsonify({"message": "Kullanıcı ID ve Makine ID zorunludur"}), 400
+
+    user = User.query.get(user_id)
+    machine = Machine.query.get(machine_id)
+
+    if not user or not machine:
+        return jsonify({"message": "Kullanıcı veya makine bulunamadı"}), 404
+
+    # Zaten atanmış mı kontrol et
+    existing_assignment = MachineAssignment.query.filter_by(user_id=user_id, machine_id=machine_id).first()
+    if existing_assignment:
+        return jsonify({"message": "Bu makine zaten bu kullanıcıya atanmış"}), 409 # Conflict
+
+    new_assignment = MachineAssignment(user_id=user_id, machine_id=machine_id)
+    db.session.add(new_assignment)
+    db.session.commit()
+    return jsonify({"message": f"Makine '{machine.friendly_name or machine.name}' kullanıcı '{user.username}'a başarıyla atandı"}), 201
+
+# Yeni: Tüm makine atamalarını listeleme endpoint'i
+@app.route('/assignments', methods=['GET'])
+def get_assignments():
+    assignments = MachineAssignment.query.all()
+    assignments_data = []
+    for assign in assignments:
+        assign_dict = assign.to_dict()
+        assign_dict['username'] = assign.user.username if assign.user else 'Bilinmiyor'
+        assign_dict['machine_name'] = assign.machine.friendly_name or assign.machine.name if assign.machine else 'Bilinmiyor'
+        assignments_data.append(assign_dict)
+    return jsonify(assignments_data), 200
+
+# Yeni: Atama silme endpoint'i
+@app.route('/assignments/<int:assignment_id>', methods=['DELETE'])
+def delete_assignment(assignment_id):
+    assignment = MachineAssignment.query.get(assignment_id)
+    if not assignment:
+        return jsonify({"message": "Atama bulunamadı"}), 404
+
+    db.session.delete(assignment)
+    db.session.commit()
+    return jsonify({"message": "Atama başarıyla silindi"}), 200
 
 
 if __name__ == '__main__':
