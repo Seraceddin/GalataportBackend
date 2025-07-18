@@ -261,25 +261,28 @@ def get_my_machines(user_id):
 def start_usage():
     data = request.get_json()
     user_id = data.get('user_id')
-    machine_mac = data.get('machine_mac')
+    machine_id = data.get('machine_id') # <<<<<<<<<< BURAYI DEĞİŞTİRDİK!
+
+    if user_id is None or machine_id is None: # None kontrolü ekledik
+        return jsonify({"message": "Kullanıcı ID veya Makine ID eksik"}), 400
 
     user = User.query.get(user_id)
-    machine = Machine.query.filter_by(bluetooth_mac=machine_mac).first()
+    machine = Machine.query.get(machine_id) # <<<<<<<<<< BURAYI DEĞİŞTİRDİK!
 
     if not user or not machine:
-        return jsonify({"message": "Kullanıcı veya makine bulunamadı"}), 404
-    
+        return jsonify({"message": "Kullanıcı veya makine bulunamadı"}), 404 # 404 yerine 400 daha uygun olabilir
+
+    # Yetki kontrolü (şimdilik basit: atanmışsa veya admin/manager ise)
     if user.role == 'technician':
         assignment = MachineAssignment.query.filter_by(user_id=user.id, machine_id=machine.id).first()
         if not assignment:
             return jsonify({"message": "Bu makineyi kullanmaya yetkiniz yok"}), 403
 
-    # Eğer makine şu an kullanımda ise (devam eden bir log varsa), eskiyi bitirip yeni başlatma mantığı eklenebilir.
-    # Şimdilik basitçe yeni bir log başlatıyoruz.
     new_log = UsageLog(user_id=user.id, machine_id=machine.id, start_time=datetime.utcnow())
     db.session.add(new_log)
     db.session.commit()
     return jsonify({"message": "Kullanım başlatıldı", "log_id": new_log.id}), 200
+
 
 # Makine kullanımı sonlandırma endpoint'i
 @app.route('/usage/end', methods=['POST'])
